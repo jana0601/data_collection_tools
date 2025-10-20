@@ -1,6 +1,12 @@
 # Data collection tool
 
 A tool for capturing and preprocessing camera data, designed to support both static and dynamic gesture recognition. Enables real-time data collection and analysis for use in gesture-controlled interfaces, human-computer interaction, and computer vision applications.
+
+## Interface
+
+![Interface](https://github.com/jana0601/data_collection_tools/blob/main/interface.jpg)
+
+
 ## Prerequisites
 - Windows 10/11
 - Python 3.10+
