@@ -6,17 +6,23 @@ This directory contains real-time gesture classification inference applications 
 
 ## 🚀 Quick Start
 
-### 1. Check if Models Exist
+### 1. Train Models (Required First Step)
+```bash
+python train_multiclass_mediapipe.py
+```
+**Important**: You must train models before running inference applications!
+
+### 2. Check if Models Exist
 ```bash
 python run_inference.py --check-models
 ```
 
-### 2. Run GUI Application
+### 3. Run GUI Application
 ```bash
 python run_inference.py --mode gui
 ```
 
-### 3. Run CLI Application
+### 4. Run CLI Application
 ```bash
 python run_inference.py --mode cli
 ```
@@ -31,6 +37,73 @@ python run_inference.py --mode cli
 ### Supporting Files
 - **`inference.py`** - Core inference engine (legacy)
 - **`gesture_classifier.py`** - Model management and training utilities
+- **`train_multiclass_mediapipe.py`** - **CRITICAL**: Model training script, process directly from video.
+- **`data_preprocessing.py`** - Data loading and feature extraction
+
+## 🎓 Model Training
+
+### Training Script: `train_multiclass_mediapipe.py`
+
+This script is **essential** for creating the models used by inference applications. It performs the complete machine learning pipeline:
+
+#### What It Does
+1. **Loads gesture data** from `data/static_gestures/records.jsonl`
+2. **Extracts features** using MediaPipe pose landmarks
+3. **Trains multiple models**:
+   - Random Forest Classifier
+   - Support Vector Machine (SVM)
+   - Neural Network (Multi-layer Perceptron)
+4. **Evaluates performance** and selects the best model
+5. **Saves trained models** to `models_2class/` directory
+6. **Generates metadata** for inference applications
+
+#### Training Process
+```bash
+# Run the training script
+python train_multiclass_mediapipe.py
+```
+
+**Expected Output:**
+```
+Loading data from data/static_gestures/records.jsonl...
+Discovered gesture classes: ['g1', 'g2']
+Label distribution: {'g1': 32, 'g2': 33}
+Total samples: 65
+
+Training Random Forest...
+Training SVM...
+Training Neural Network...
+
+Model Performance:
+- Random Forest: 76.92% accuracy
+- SVM: 80.77% accuracy  
+- Neural Network: 84.62% accuracy (BEST)
+
+Saving models to models_2class/...
+✅ Training completed successfully!
+```
+
+#### Data Requirements
+- **Input**: `data/static_gestures/records.jsonl` with gesture samples
+- **Format**: Each record contains `id`, `label`, `landmarks`, `visibility`
+- **Minimum**: At least 2 gesture classes with multiple samples each
+- **Recommended**: 20+ samples per gesture class for good performance
+
+#### Output Files
+After training, the following files are created in `models_2class/`:
+- `gesture_2class_metadata.json` - Model metadata and class names
+- `gesture_2class_random_forest.joblib` - Random Forest model
+- `gesture_2class_svm.joblib` - SVM model  
+- `gesture_2class_neural_network.joblib` - Neural Network model
+- `gesture_multiclass_metadata.json` - Backup metadata file
+
+#### Training Configuration
+The script automatically:
+- **Splits data**: 80% training, 20% testing
+- **Scales features**: StandardScaler for neural network
+- **Handles missing data**: Filters out invalid samples
+- **Cross-validation**: 5-fold CV for model selection
+- **Feature extraction**: 23 geometric features per sample
 
 ## 🎯 Features
 
@@ -172,7 +245,22 @@ g1: 24 predictions
 ```
 [ERROR] Metadata not found: models_2class/gesture_multiclass_metadata.json
 ```
-**Solution**: Train models first using `train_multiclass_mediapipe.py`
+**Solution**: 
+1. **First, collect gesture data** using `desktop/app.py` (data collection)
+2. **Then train models** using `train_multiclass_mediapipe.py`
+3. **Finally, run inference** using these applications
+
+**Complete Workflow:**
+```bash
+# Step 1: Collect gesture data
+python desktop/app.py
+
+# Step 2: Train models  
+python train_multiclass_mediapipe.py
+
+# Step 3: Run inference
+python run_inference.py --mode gui
+```
 
 #### 2. Camera Not Opening
 ```
@@ -213,10 +301,26 @@ Based on training results:
 
 ## 🔄 Integration
 
+### Complete Workflow
+The inference applications are part of a complete gesture recognition pipeline:
+
+1. **📹 Data Collection** (`desktop/app.py`)
+   - Collect gesture samples using camera
+   - Save landmarks and metadata to `data/static_gestures/records.jsonl`
+
+2. **🎓 Model Training** (`train_multiclass_mediapipe.py`) 
+   - **CRITICAL STEP**: Train ML models from collected data
+   - Creates `models_2class/` directory with trained models
+   - Generates metadata for inference applications
+
+3. **🔮 Inference** (these applications)
+   - Real-time gesture classification using trained models
+   - GUI and CLI interfaces for different use cases
+
 ### With Data Collection
 The inference applications work seamlessly with the data collection system:
 1. **Collect data** using `desktop/app.py`
-2. **Train models** using `train_multiclass_mediapipe.py`
+2. **Train models** using `train_multiclass_mediapipe.py` ⭐ **REQUIRED**
 3. **Run inference** using these applications
 
 ### Custom Models
