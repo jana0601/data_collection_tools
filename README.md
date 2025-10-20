@@ -1,14 +1,13 @@
-# YogaPose
+# Data collection tool
 
-A desktop Yoga pose recognition and feedback app using Python, PySide6, OpenCV, and MediaPipe Pose. Runs fully on-device.
-
+A tool for capturing and preprocessing camera data, designed to support both static and dynamic gesture recognition. Enables real-time data collection and analysis for use in gesture-controlled interfaces, human-computer interaction, and computer vision applications.
 ## Prerequisites
 - Windows 10/11
 - Python 3.10+
 
 ## Quick Start (Windows PowerShell)
 ```powershell
-Set-Location E:\From_C\llm_project\YogaPose
+Set-Location E:\Fromyourpath
 ./run_desktop.ps1
 ```
 This script creates a virtual environment, installs dependencies, and launches the app.
@@ -31,7 +30,7 @@ python -c "import desktop.app as da; da.main()"
 
 ## Project Structure
 ```
-YogaPose/
+data_collection_tools/
   desktop/
     app.py           # PySide6 window, video loop, feedback display
     pose_pipeline.py # MediaPipe Pose wrapper
