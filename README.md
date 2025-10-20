@@ -15,6 +15,9 @@ A tool for capturing and preprocessing camera data, designed to support both sta
 ```powershell
 Set-Location E:\Fromyourpath
 ./run_desktop.ps1
+or 
+powershell -ExecutionPolicy Bypass -File .\run_desktop.ps1
+
 ```
 This script creates a virtual environment, installs dependencies, and launches the app.
 
