@@ -1,6 +1,8 @@
-# YogaPose
+# Gesture Recognition
 
-A desktop Yoga pose recognition and feedback app using Python, PySide6, OpenCV, and MediaPipe Pose. Runs fully on-device.
+A desktop gesture recognition and feedback app using Python, PySide6, OpenCV, and MediaPipe Pose. Runs fully on-device.
+
+![Interface Screenshot](interface_classification.jpg)
 
 ## Prerequisites
 - Windows 10/11
@@ -27,17 +29,17 @@ python -c "import desktop.app as da; da.main()"
 - Live webcam capture
 - MediaPipe Pose estimation
 - Landmark and skeleton overlay
-- Tadasana (Mountain Pose) basic rules and feedback
+- Gesture recognition and feedback
 
 ## Project Structure
 ```
-YogaPose/
+GestureRecognition/
   desktop/
     app.py           # PySide6 window, video loop, feedback display
     pose_pipeline.py # MediaPipe Pose wrapper
     overlay.py       # Canvas overlay drawing
     geometry.py      # Angles and normalization utilities
-    rules.py         # Tadasana rules and cues
+    rules.py         # Gesture rules and cues
   web/               # (Initial web scaffold; not used in desktop mode)
   run_desktop.ps1    # One-command launcher for Windows
 ```
