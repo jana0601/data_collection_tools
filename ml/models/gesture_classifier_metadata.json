@@ -1,0 +1,11 @@
+{
+  "best_model": "svm",
+  "class_names": [
+    "downward_dog",
+    "tadasana",
+    "tree_pose",
+    "warrior_1",
+    "warrior_2"
+  ],
+  "model_count": 3
+}

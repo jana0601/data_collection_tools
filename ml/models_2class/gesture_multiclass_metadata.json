@@ -1,0 +1,8 @@
+{
+  "best_model": "neural_network",
+  "class_names": [
+    "g1",
+    "g2"
+  ],
+  "model_count": 3
+}

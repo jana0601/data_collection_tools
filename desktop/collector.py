@@ -40,6 +40,8 @@ class StaticGestureCollector:
         # Video mode frame tracking
         self._video_frame_count: int = 0
         self._video_frames_buffer: list[np.ndarray] = []
+        self._video_landmarks_buffer: list[np.ndarray] = []
+        self._video_visibility_buffer: list[np.ndarray] = []
 
     def _ensure_dirs(self) -> None:
         self.config.out_dir.mkdir(parents=True, exist_ok=True)
@@ -186,80 +188,188 @@ class StaticGestureCollector:
     def _handle_video_mode(self, label: str, landmarks_norm: Optional[np.ndarray], 
                           visibility: Optional[np.ndarray], image_rgb: Optional[np.ndarray],
                           image_size: tuple[int, int], ts_ms: int, camera_index: int) -> Optional[Path]:
-        """Handle video mode - count frames and save video every 30 frames."""
-        if image_rgb is not None:
+        """Handle video mode - collect landmarks from each frame and merge as one sample."""
+        if landmarks_norm is not None and visibility is not None:
             # Increment frame count
             self._video_frame_count += 1
-            self._video_frames_buffer.append(image_rgb.copy())
             
-            print(f"Frame {self._video_frame_count}/30")
+            # Store landmarks and visibility from this frame
+            self._video_landmarks_buffer.append(landmarks_norm.copy())
+            self._video_visibility_buffer.append(visibility.copy())
             
-            # Check if we have 30 frames
+            # Also store image frames if saving videos
+            if image_rgb is not None:
+                self._video_frames_buffer.append(image_rgb.copy())
+            
+            print(f"Frame {self._video_frame_count}/{self.config.video_frames}")
+            
+            # Check if we have enough frames (or allow saving with fewer frames using zero padding)
             if self._video_frame_count >= self.config.video_frames:
-                # Save video
-                sample_id = time.strftime("%Y%m%dT%H%M%S") + f"_{ts_ms%1000:03d}"
-                try:
-                    import cv2
-                    clean_gesture = "".join(c for c in label if c.isalnum() or c in (' ', '-', '_')).strip()
-                    clean_gesture = clean_gesture.replace(' ', '_').lower()
+                # Merge landmarks from all frames (with zero padding if needed)
+                merged_landmarks = self._merge_video_landmarks()
+                merged_visibility = self._merge_video_visibility()
+                
+                if merged_landmarks is not None and merged_visibility is not None:
+                    # Save video if enabled
+                    sample_id = time.strftime("%Y%m%dT%H%M%S") + f"_{ts_ms%1000:03d}"
                     
-                    images_dir = self._get_images_dir()
-                    video_filename = f"{self.config.subject_id}_{clean_gesture}_{sample_id}.mp4"
-                    video_path = images_dir / video_filename
+                    if self.config.save_images and self._video_frames_buffer:
+                        try:
+                            import cv2
+                            clean_gesture = "".join(c for c in label if c.isalnum() or c in (' ', '-', '_')).strip()
+                            clean_gesture = clean_gesture.replace(' ', '_').lower()
+                            
+                            images_dir = self._get_images_dir()
+                            video_filename = f"{self.config.subject_id}_{clean_gesture}_{sample_id}.mp4"
+                            video_path = images_dir / video_filename
+                            
+                            # Create video writer
+                            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                            fps = 10  # 10 fps for the video
+                            h, w = self._video_frames_buffer[0].shape[:2]
+                            out = cv2.VideoWriter(str(video_path), fourcc, fps, (w, h))
+                            
+                            # Write frames
+                            for frame in self._video_frames_buffer:
+                                bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                                out.write(bgr_frame)
+                            
+                            out.release()
+                            print(f"Successfully saved video: {video_path}")
+                            
+                        except Exception as e:
+                            print(f"Error saving video: {e}")
                     
-                    # Create video writer
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    fps = 10  # 10 fps for the video
-                    h, w = self._video_frames_buffer[0].shape[:2]
-                    out = cv2.VideoWriter(str(video_path), fourcc, fps, (w, h))
-                    
-                    # Write frames
-                    for frame in self._video_frames_buffer:
-                        bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                        out.write(bgr_frame)
-                    
-                    out.release()
-                    print(f"Successfully saved video: {video_path}")
-                    
-                    # Save record
+                    # Save record with merged landmarks
                     record = {
                         "id": sample_id,
                         "subject_id": self.config.subject_id,
                         "label": label,
-                        "landmarks": landmarks_norm.tolist() if landmarks_norm is not None else [],
-                        "visibility": visibility.tolist() if visibility is not None else [],
+                        "landmarks": merged_landmarks.tolist(),
+                        "visibility": merged_visibility.tolist(),
                         "image_size": [int(image_size[0]), int(image_size[1])],
                         "timestamp_ms": int(ts_ms),
                         "camera_index": int(camera_index),
                         "video_frames": self.config.video_frames,
-                        "note": ""
+                        "note": f"Merged from {self.config.video_frames} frames"
                     }
                     records_path = self.config.out_dir / "records.jsonl"
                     with records_path.open("a", encoding="utf-8") as f:
                         f.write(json.dumps(record, ensure_ascii=False) + "\n")
                     
-                    # Reset frame count and buffer for next sample
+                    print(f"Saved merged sample with {self.config.video_frames} frames")
+                    
+                    # Reset buffers for next sample
                     self._video_frame_count = 0
                     self._video_frames_buffer.clear()
+                    self._video_landmarks_buffer.clear()
+                    self._video_visibility_buffer.clear()
                     self._current_session_frames = 0
                     self._last_save_ts_ms = ts_ms
                     self._saved_count += 1
                     return records_path
                     
-                except Exception as e:
-                    print(f"Error saving video: {e}")
+                else:
+                    print("Failed to merge landmarks - resetting")
                     self._video_frame_count = 0
                     self._video_frames_buffer.clear()
-                    self._current_session_frames = 0
+                    self._video_landmarks_buffer.clear()
+                    self._video_visibility_buffer.clear()
         
         return None
+    
+    def _merge_video_landmarks(self) -> Optional[np.ndarray]:
+        """Merge landmarks from all video frames with zero padding."""
+        if not self._video_landmarks_buffer:
+            return None
+        
+        # Stack all landmarks: (frames, 33, 3)
+        landmarks_stack = np.stack(self._video_landmarks_buffer, axis=0)
+        
+        # Zero pad to exactly 30 frames
+        target_frames = self.config.video_frames
+        current_frames = landmarks_stack.shape[0]
+        
+        if current_frames < target_frames:
+            # Zero pad the missing frames
+            padding_frames = target_frames - current_frames
+            zero_padding = np.zeros((padding_frames, 33, 3))
+            landmarks_stack = np.vstack([landmarks_stack, zero_padding])
+        elif current_frames > target_frames:
+            # Truncate if somehow we have more frames
+            landmarks_stack = landmarks_stack[:target_frames]
+        
+        # Average landmarks across frames
+        merged_landmarks = np.mean(landmarks_stack, axis=0)
+        
+        return merged_landmarks
+    
+    def _merge_video_visibility(self) -> Optional[np.ndarray]:
+        """Merge visibility from all video frames with zero padding."""
+        if not self._video_visibility_buffer:
+            return None
+        
+        # Stack all visibility: (frames, 33)
+        visibility_stack = np.stack(self._video_visibility_buffer, axis=0)
+        
+        # Zero pad to exactly 30 frames
+        target_frames = self.config.video_frames
+        current_frames = visibility_stack.shape[0]
+        
+        if current_frames < target_frames:
+            # Zero pad the missing frames
+            padding_frames = target_frames - current_frames
+            zero_padding = np.zeros((padding_frames, 33))
+            visibility_stack = np.vstack([visibility_stack, zero_padding])
+        elif current_frames > target_frames:
+            # Truncate if somehow we have more frames
+            visibility_stack = visibility_stack[:target_frames]
+        
+        # Average visibility across frames
+        merged_visibility = np.mean(visibility_stack, axis=0)
+        
+        return merged_visibility
 
     def finalize_session(self) -> None:
         """Call this when collection stops to trim the final session."""
+        # Save any remaining video frames with zero padding
+        if self.config.video_mode and self._video_frame_count > 0:
+            print(f"Saving partial video sample with {self._video_frame_count} frames (zero padded to {self.config.video_frames})")
+            merged_landmarks = self._merge_video_landmarks()
+            merged_visibility = self._merge_video_visibility()
+            
+            if merged_landmarks is not None and merged_visibility is not None:
+                sample_id = time.strftime("%Y%m%dT%H%M%S") + "_999"
+                
+                # Save record with merged landmarks (zero padded)
+                record = {
+                    "id": sample_id,
+                    "subject_id": self.config.subject_id,
+                    "label": self._label or "unknown",
+                    "landmarks": merged_landmarks.tolist(),
+                    "visibility": merged_visibility.tolist(),
+                    "image_size": [640, 480],  # Default size
+                    "timestamp_ms": int(time.time() * 1000),
+                    "camera_index": 0,
+                    "video_frames": self.config.video_frames,
+                    "actual_frames": self._video_frame_count,
+                    "note": f"Partial sample with {self._video_frame_count} frames, zero padded to {self.config.video_frames}"
+                }
+                records_path = self.config.out_dir / "records.jsonl"
+                with records_path.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                
+                print(f"Saved partial sample with zero padding")
+                self._saved_count += 1
+        
         if self._session_images:
             self._trim_session_images()
         # Reset session frame count
         self._current_session_frames = 0
+        self._video_frame_count = 0
+        self._video_frames_buffer.clear()
+        self._video_landmarks_buffer.clear()
+        self._video_visibility_buffer.clear()
 
     def reset_session(self) -> None:
         """Reset session counters when starting new collection."""
