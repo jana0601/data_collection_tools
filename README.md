@@ -1,4 +1,4 @@
-# YogaPose
+# Gesture recognition
 
 A desktop Yoga pose recognition and feedback app using Python, PySide6, OpenCV, and MediaPipe Pose. Runs fully on-device.
 
@@ -8,7 +8,7 @@ A desktop Yoga pose recognition and feedback app using Python, PySide6, OpenCV, 
 
 ## Quick Start (Windows PowerShell)
 ```powershell
-Set-Location E:\From_C\llm_project\YogaPose
+Set-Location yourpath
 ./run_desktop.ps1
 ```
 This script creates a virtual environment, installs dependencies, and launches the app.
