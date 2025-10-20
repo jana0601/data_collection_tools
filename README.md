@@ -35,7 +35,7 @@ python -c "import desktop.app as da; da.main()"
 - Live webcam capture
 - MediaPipe Pose estimation
 - Landmark and skeleton overlay
-- Tadasana (Mountain Pose) basic rules and feedback
+
 
 ## Project Structure
 ```
